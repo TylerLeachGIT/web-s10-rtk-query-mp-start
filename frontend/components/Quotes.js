@@ -4,34 +4,53 @@ import {
   setHighlightedQuote,
   toggleVisibility,
 } from '../state/quotesSlice'
+import { useGetQuotesQuery, useDeleteQuoteMutation, useToggleFakeMutation } from '../state/quotesApi'
 
 export default function Quotes() {
-  const quotes = [
-    {
-      id: 1,
-      quoteText: "Don't cry because it's over, smile because it happened.",
-      authorName: "Dr. Seuss",
-      apocryphal: true,
-    },
-    {
-      id: 2,
-      quoteText: "So many books, so little time.",
-      authorName: "Frank Zappa",
-      apocryphal: false,
-    },
-    {
-      id: 3,
-      quoteText: "Be yourself; everyone else is already taken.",
-      authorName: "Oscar Wilde",
-      apocryphal: false,
-    },
-  ]
-  const displayAllQuotes = useSelector(st => st.quotesState.displayAllQuotes)
-  const highlightedQuote = useSelector(st => st.quotesState.highlightedQuote)
+  const { data: quotes = [], isLoading, isError } = useGetQuotesQuery()
+  const [deleteQuote, { isLoading: isDeleting }] = useDeleteQuoteMutation()
+  const [toggleFake, { isLoading: isToggling }] = useToggleFakeMutation()
+
+  const displayAllQuotes = useSelector(st => st.quotes.displayAllQuotes)
+  const highlightedQuote = useSelector(st => st.quotes.highlightedQuote)
   const dispatch = useDispatch()
+  
+  if (isLoading) {
+    return <div id="quotes">
+      <h3>Loading quotes...</h3>
+      <div className="loading-message">Please wait while we fetch the quotes...</div>
+    </div>
+  }
+
+  if (isError) {
+    return <div id="quotes">
+       <h3>Error!</h3>
+      <div className="error-message">Failed to load quotes. Please try again later.</div>
+    </div>
+  }
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteQuote(id)
+    } catch (err) {
+      console.error('Failed to delete quote:', err)
+    }
+  }
+
+  const handleToggleFake = async (id, currentApocryphal) => {
+    try {
+      await toggleFake({ id, apocryphal: !currentApocryphal })
+    } catch (err) {
+      console.error('Failed to toggle fake status:', err)
+    }
+  }
+
   return (
     <div id="quotes">
       <h3>Quotes</h3>
+      {(isDeleting || isToggling) && (
+        <div className="loading-message">Processing your request...</div>
+      )}
       <div>
         {
           quotes?.filter(qt => {
@@ -43,12 +62,24 @@ export default function Quotes() {
                 className={`quote${qt.apocryphal ? " fake" : ''}${highlightedQuote === qt.id ? " highlight" : ''}`}
               >
                 <div>{qt.quoteText}</div>
-                <div>{qt.authorName}</div>
+                <div>{qt.quoteAuthor}</div>
                 <div className="quote-buttons">
-                  <button>DELETE</button>
+
+                  <button
+                  onClick={() => handleDelete(qt.id)}
+                  disabled={isDeleting}
+                  >
+                    {isDeleting ? 'Deleting...' : 'DELETE'}
+                    </button>
                   <button onClick={() => dispatch(setHighlightedQuote(qt.id))}>HIGHLIGHT</button>
-                  <button>FAKE</button>
-                </div>
+                  <button
+                  onClick={() => handleToggleFake(qt.id, qt.apocryphal)}
+                  disabled={isToggling}
+                  >
+                    {isToggling ? 'Updating...' : (qt.apocryphal ? 'REAL' : 'FAKE')}
+                    </button>
+                
+              </div>
               </div>
             ))
         }
